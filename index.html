@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>交互式子网掩码模拟器 | 网络号/主机号可视化</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Roboto', 'Monaco', 'Cascadia Code', monospace;
+        }
+        body {
+            background: linear-gradient(145deg, #e9f0f5 0%, #d9e2ec 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        /* 主卡片 */
+        .sim-card {
+            max-width: 1100px;
+            width: 100%;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            box-shadow: 0 25px 45px -12px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.05);
+            padding: 1.8rem 2rem;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255,255,255,0.6);
+        }
+        h1 {
+            font-size: 1.85rem;
+            font-weight: 600;
+            margin: 0 0 0.25rem 0;
+            background: linear-gradient(135deg, #1A2A3F, #2C4A6E);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+            display: inline-block;
+        }
+        .sub {
+            color: #4b6e8a;
+            margin-bottom: 1.8rem;
+            border-left: 4px solid #3b82f6;
+            padding-left: 12px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        /* 双栏布局 */
+        .main-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .control-group {
+            flex: 1.2;
+            min-width: 240px;
+        }
+        .result-group {
+            flex: 1.8;
+            min-width: 280px;
+        }
+        /* 输入控件样式 */
+        .field {
+            background: #f8fafc;
+            border-radius: 1.2rem;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: inset 0 1px 2px #00000008, 0 2px 4px rgba(0,0,0,0.02);
+            border: 1px solid #e2edf2;
+        }
+        .field-label {
+            font-weight: 600;
+            color: #1e3a5f;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+        }
+        .field-label i {
+            font-style: normal;
+            font-weight: 700;
+            background: #d9e8fb;
+            padding: 2px 8px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+        }
+        input, .mask-readonly {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 1rem;
+            border-radius: 60px;
+            border: 1.5px solid #cbdde9;
+            background: white;
+            transition: 0.2s;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-weight: 500;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+        }
+        /* 滑块 + 数值联动 */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        input[type="range"] {
+            flex: 3;
+            min-width: 150px;
+            height: 6px;
+            -webkit-appearance: none;
+            background: #cbdde9;
+            border-radius: 10px;
+        }
+        input[type="range"]:focus {
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #1f6392;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            border: 2px solid white;
+        }
+        .cidr-value {
+            flex: 0.8;
+            background: #eef3fc;
+            border-radius: 36px;
+            text-align: center;
+            font-weight: 700;
+            font-family: monospace;
+            font-size: 1.2rem;
+            padding: 8px 0;
+        }
+        .mask-box {
+            background: #eef3fc;
+            border-radius: 36px;
+            padding: 10px 18px;
+            text-align: center;
+            font-family: monospace;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #075985;
+        }
+        .result-card {
+            background: #ffffffdd;
+            border-radius: 1.5rem;
+            padding: 0.2rem 0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            border-bottom: 1px dashed #cbd5e1;
+            padding: 0.9rem 0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .info-label {
+            font-weight: 700;
+            color: #1e293b;
+            background: #f1f5f9;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+        }
+        .info-value {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-weight: 600;
+            color: #0c4a6e;
+            word-break: break-all;
+            text-align: right;
+            font-size: 1rem;
+        }
+        .host-decimal {
+            font-size: 0.85rem;
+            color: #4b5563;
+            font-weight: normal;
+        }
+        .binary-section {
+            background: #f1f5f9;
+            border-radius: 1.2rem;
+            padding: 1rem 1.2rem;
+            margin-top: 1rem;
+        }
+        .binary-row {
+            margin-bottom: 1rem;
+            font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+        .binary-label {
+            font-weight: 700;
+            color: #334155;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .bits {
+            background: #0f172a0c;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            line-height: 1.5;
+            display: inline-block;
+            width: 100%;
+            font-family: monospace;
+        }
+        .highlight-net {
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 6px;
+            padding: 0 2px;
+            font-weight: 600;
+        }
+        .highlight-host {
+            background-color: #f97316;
+            color: white;
+            border-radius: 6px;
+            padding: 0 2px;
+            font-weight: 600;
+        }
+        .badge {
+            background: #d4e6f1;
+            border-radius: 30px;
+            padding: 2px 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        hr {
+            margin: 1rem 0;
+            border-color: #e2edf2;
+        }
+        footer {
+            font-size: 0.7rem;
+            text-align: center;
+            color: #5b7c9c;
+            margin-top: 1.8rem;
+        }
+        @media (max-width: 700px) {
+            .sim-card {
+                padding: 1.2rem;
+            }
+            .info-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .info-value {
+                text-align: left;
+            }
+        }
+        .error-msg {
+            color: #dc2626;
+            background: #fee2e2;
+            border-radius: 40px;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            margin-top: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="sim-card">
+    <h1>🌐 子网掩码模拟器</h1>
+    <div class="sub">动态计算网络号 / 主机号 · 二进制可视化 · 拖拽/点击掩码长度</div>
+
+    <div class="main-panel">
+        <!-- 左侧控制区 -->
+        <div class="control-group">
+            <div class="field">
+                <div class="field-label">
+                    📡 IP 地址 <i>可编辑</i>
+                </div>
+                <input type="text" id="ipInput" value="192.168.1.100" placeholder="例如: 192.168.1.100">
+            </div>
+
+            <div class="field">
+                <div class="field-label">
+                    🎚️ 掩码长度 (CIDR) <i>拖拽滑块 / 点击数值</i>
+                </div>
+                <div class="slider-container">
+                    <input type="range" id="maskSlider" min="0" max="32" step="1" value="24">
+                    <input type="number" id="maskNumber" min="0" max="32" step="1" value="24" style="width: 80px; text-align: center; padding: 8px;">
+                    <span class="cidr-value">/ <span id="cidrDisplay">24</span></span>
+                </div>
+                <div style="margin-top: 12px;">
+                    <div class="field-label" style="margin-bottom: 4px;">🔘 点分十进制掩码</div>
+                    <div class="mask-box" id="dottedMask">255.255.255.0</div>
+                </div>
+                <div class="badge" style="margin-top: 12px; background:#e9f0f5; display:inline-block;">
+                    💡 提示: 拖动滑块 / 修改数字 → 实时更新网络号与主机号
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧结果区 -->
+        <div class="result-group">
+            <div class="result-card">
+                <div class="info-row">
+                    <span class="info-label">🏷️ CIDR 表示法</span>
+                    <span class="info-value" id="cidrNotation">192.168.1.100/24</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">🌐 网络号 (Network Address)</span>
+                    <span class="info-value" id="networkAddr">192.168.1.0</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">💻 主机号 (Host Identifier)</span>
+                    <span class="info-value" id="hostAddr">0.0.0.100</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">🔢 主机号数值 (十进制)</span>
+                    <span class="info-value" id="hostDecimal">100</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">📊 主机位数 / 可用主机数</span>
+                    <span class="info-value" id="hostStats">8 位 / 254 台</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 二进制高亮可视化区 -->
+    <div class="binary-section">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap:wrap;">
+            <span class="binary-label">🔬 二进制分析 (网络位 🔵 / 主机位 🟠)</span>
+            <div><span style="background:#3b82f6; color:white; padding:2px 8px; border-radius:20px;">网络位</span> <span style="background:#f97316; color:white; padding:2px 8px; border-radius:20px;">主机位</span></div>
+        </div>
+        <div class="binary-row">
+            <div class="binary-label">📌 IP 地址 二进制</div>
+            <div id="ipBinary" class="bits">11000000 10101000 00000001 01100100</div>
+        </div>
+        <div class="binary-row">
+            <div class="binary-label">🎭 子网掩码 二进制</div>
+            <div id="maskBinary" class="bits">11111111 11111111 11111111 00000000</div>
+        </div>
+        <div class="binary-row">
+            <div class="binary-label">🏁 网络地址 二进制</div>
+            <div id="netBinary" class="bits">11000000 10101000 00000001 00000000</div>
+        </div>
+    </div>
+    <footer>
+        ⚡ 交互式子网掩码模拟器 | 网络号 = IP & 掩码 &nbsp;|&nbsp; 主机号 = IP & (~掩码)
+    </footer>
+</div>
+
+<script>
+    // ---------- 工具函数 ----------
+    // 点分十进制 -> 32位无符号整数
+    function ipToInt(ipStr) {
+        const parts = ipStr.split('.');
+        if (parts.length !== 4) return null;
+        let intVal = 0;
+        for (let i = 0; i < 4; i++) {
+            const octet = Number(parts[i]);
+            if (isNaN(octet) || octet < 0 || octet > 255) return null;
+            intVal = (intVal << 8) | octet;
+        }
+        return intVal >>> 0;
+    }
+
+    // 整数 -> 点分十进制
+    function intToIp(intVal) {
+        if (intVal === undefined || intVal === null) return "0.0.0.0";
+        const octet1 = (intVal >>> 24) & 0xFF;
+        const octet2 = (intVal >>> 16) & 0xFF;
+        const octet3 = (intVal >>> 8) & 0xFF;
+        const octet4 = intVal & 0xFF;
+        return `${octet1}.${octet2}.${octet3}.${octet4}`;
+    }
+
+    // 掩码长度 -> 掩码整数 (0~32)
+    function maskLenToInt(prefixLen) {
+        if (prefixLen === 0) return 0;
+        if (prefixLen === 32) return 0xFFFFFFFF;
+        const mask = (0xFFFFFFFF << (32 - prefixLen)) >>> 0;
+        return mask;
+    }
+
+    // 整数掩码 -> 点分十进制
+    function maskIntToDotted(maskInt) {
+        return intToIp(maskInt);
+    }
+
+    // 生成32位二进制字符串 (带每8位空格)
+    function intToBinaryString(intVal) {
+        if (intVal === undefined) return "00000000 00000000 00000000 00000000";
+        let binary = (intVal >>> 0).toString(2).padStart(32, '0');
+        // 每8位插入空格
+        return binary.match(/.{1,8}/g).join(' ');
+    }
+
+    // 根据掩码长度，高亮IP二进制的网络位和主机位 (网络位蓝色背景，主机位橙色背景)
+    // 接收 ip 整数, maskLen, 返回带 HTML 标签的二进制串 (保留空格分组)
+    function highlightIpBits(ipInt, maskLen) {
+        if (ipInt === null) return "无效IP";
+        let binStr = (ipInt >>> 0).toString(2).padStart(32, '0');
+        let parts = [];
+        for (let i = 0; i < 32; i++) {
+            let bit = binStr[i];
+            let isNet = (i < maskLen);
+            let spanClass = isNet ? 'highlight-net' : 'highlight-host';
+            parts.push(`<span class="${spanClass}">${bit}</span>`);
+            if ((i + 1) % 8 === 0 && i !== 31) parts.push(' ');
+        }
+        return parts.join('');
+    }
+
+    // 高亮掩码二进制: 前maskLen位为1 (网络位高亮)，后为0 (主机位高亮)
+    function highlightMaskBits(maskInt, maskLen) {
+        let binStr = (maskInt >>> 0).toString(2).padStart(32, '0');
+        let parts = [];
+        for (let i = 0; i < 32; i++) {
+            let bit = binStr[i];
+            // 掩码本身前maskLen位为1是网络部分，后面为0主机部分，颜色风格一致
+            let isNetPart = (i < maskLen);
+            let spanClass = isNetPart ? 'highlight-net' : 'highlight-host';
+            parts.push(`<span class="${spanClass}">${bit}</span>`);
+            if ((i + 1) % 8 === 0 && i !== 31) parts.push(' ');
+        }
+        return parts.join('');
+    }
+
+    // 网络地址二进制直接普通显示 (无高亮也行，可以显示普通)
+    function ordinaryBinary(netInt) {
+        if (netInt === undefined) return "00000000 00000000 00000000 00000000";
+        return intToBinaryString(netInt);
+    }
+
+    // 计算主机数量相关统计
+    function getHostStats(maskLen) {
+        const hostBits = 32 - maskLen;
+        const totalAddresses = Math.pow(2, hostBits);
+        let usableHosts;
+        if (maskLen === 32) usableHosts = 1;      // /32 只有单个地址
+        else if (maskLen === 31) usableHosts = 2; // /31 点对点 2个可用
+        else usableHosts = totalAddresses - 2;    // 减去网络地址和广播地址
+        return { hostBits, totalAddresses, usableHosts: usableHosts >= 0 ? usableHosts : 0 };
+    }
+
+    // 主更新函数
+    function updateAll() {
+        // 获取IP
+        let ipStr = document.getElementById('ipInput').value.trim();
+        let ipInt = ipToInt(ipStr);
+        const ipValid = (ipInt !== null);
+        
+        // 获取掩码长度 (从滑块或数字框，优先滑块，但双绑一致)
+        let maskLen = parseInt(document.getElementById('maskSlider').value, 10);
+        // 确保在有效范围
+        if (isNaN(maskLen)) maskLen = 24;
+        maskLen = Math.min(32, Math.max(0, maskLen));
+        // 同步两个控制器
+        const slider = document.getElementById('maskSlider');
+        const maskNum = document.getElementById('maskNumber');
+        if (slider.value != maskLen) slider.value = maskLen;
+        if (maskNum.value != maskLen) maskNum.value = maskLen;
+        document.getElementById('cidrDisplay').innerText = maskLen;
+
+        // 如果IP无效，显示错误并停止大部分计算（但仍显示掩码相关信息）
+        const errorDiv = document.getElementById('errorMsg');
+        if (!ipValid) {
+            // 显示错误样式
+            let errContainer = document.querySelector('.control-group .field:first-child');
+            let existingErr = document.getElementById('inlineError');
+            if (!existingErr) {
+                const errSpan = document.createElement('div');
+                errSpan.id = 'inlineError';
+                errSpan.className = 'error-msg';
+                errSpan.innerText = '⚠️ 无效的 IPv4 地址，请使用点分十进制 (例: 192.168.1.100)';
+                document.querySelector('.control-group .field:first-child').appendChild(errSpan);
+            } else {
+                existingErr.style.display = 'block';
+            }
+            // 清空重要结果显示占位符
+            document.getElementById('cidrNotation').innerHTML = '无效IP';
+            document.getElementById('networkAddr').innerHTML = '—';
+            document.getElementById('hostAddr').innerHTML = '—';
+            document.getElementById('hostDecimal').innerHTML = '—';
+            document.getElementById('hostStats').innerHTML = '—';
+            document.getElementById('ipBinary').innerHTML = '无效IP地址';
+            document.getElementById('maskBinary').innerHTML = intToBinaryString(maskLenToInt(maskLen));
+            document.getElementById('netBinary').innerHTML = '—';
+            document.getElementById('dottedMask').innerHTML = intToIp(maskLenToInt(maskLen));
+            return;
+        } else {
+            let errElem = document.getElementById('inlineError');
+            if (errElem) errElem.style.display = 'none';
+        }
+
+        // 有效IP继续
+        const maskInt = maskLenToInt(maskLen);
+        const dottedMask = maskIntToDotted(maskInt);
+        document.getElementById('dottedMask').innerHTML = dottedMask;
+        
+        // 计算网络地址和主机标识 (主机号)
+        const netInt = (ipInt & maskInt) >>> 0;
+        const hostInt = (ipInt & (~maskInt)) >>> 0;
+        const networkAddr = intToIp(netInt);
+        const hostAddr = intToIp(hostInt);      // 主机标识点分表示 (如0.0.0.100)
+        const hostDecimalVal = hostInt;          // 主机号十进制值
+        
+        // CIDR表示法
+        document.getElementById('cidrNotation').innerHTML = `${ipStr}/${maskLen}`;
+        document.getElementById('networkAddr').innerHTML = networkAddr;
+        document.getElementById('hostAddr').innerHTML = hostAddr;
+        document.getElementById('hostDecimal').innerHTML = hostDecimalVal;
+        
+        // 主机统计
+        const stats = getHostStats(maskLen);
+        document.getElementById('hostStats').innerHTML = `${stats.hostBits} 位 / ${stats.usableHosts} 台可用`;
+        
+        // ----- 二进制高亮区域 -----
+        // IP二进制高亮
+        const ipHighlightHtml = highlightIpBits(ipInt, maskLen);
+        document.getElementById('ipBinary').innerHTML = ipHighlightHtml;
+        
+        // 掩码二进制高亮 (依据掩码长度高亮网络位/主机位)
+        const maskHighlightHtml = highlightMaskBits(maskInt, maskLen);
+        document.getElementById('maskBinary').innerHTML = maskHighlightHtml;
+        
+        // 网络地址二进制 (普通二进制显示即可, 无高亮压力)
+        const netBinaryPlain = ordinaryBinary(netInt);
+        document.getElementById('netBinary').innerHTML = netBinaryPlain;
+        
+        // 可选：给网络地址二进制增加微妙颜色提示 (不作额外高亮但显示清晰)
+        // 额外显示主机号的二进制小提示? 已够用
+    }
+    
+    // 同步滑块与数字输入框
+    function bindMaskControls() {
+        const slider = document.getElementById('maskSlider');
+        const numberInput = document.getElementById('maskNumber');
+        const sync = (source, target) => {
+            let val = parseInt(source.value, 10);
+            if (isNaN(val)) val = 24;
+            val = Math.min(32, Math.max(0, val));
+            target.value = val;
+            slider.value = val;
+            numberInput.value = val;
+            updateAll();
+        };
+        slider.addEventListener('input', (e) => {
+            let v = parseInt(e.target.value, 10);
+            numberInput.value = v;
+            document.getElementById('cidrDisplay').innerText = v;
+            updateAll();
+        });
+        numberInput.addEventListener('input', (e) => {
+            let v = parseInt(e.target.value, 10);
+            if (!isNaN(v)) {
+                v = Math.min(32, Math.max(0, v));
+                slider.value = v;
+                document.getElementById('cidrDisplay').innerText = v;
+                updateAll();
+            } else {
+                // 无效时不做大变动
+                updateAll();
+            }
+        });
+    }
+    
+    // IP输入校验实时更新
+    function bindIpEdit() {
+        const ipField = document.getElementById('ipInput');
+        ipField.addEventListener('input', () => {
+            // 清除可能的无效残留样式
+            updateAll();
+        });
+        ipField.addEventListener('blur', () => {
+            let raw = ipField.value.trim();
+            if (ipToInt(raw) === null && raw !== "") {
+                // 无需alert，已经在update显示错误
+                updateAll();
+            } else if (raw === "") {
+                ipField.value = "192.168.1.100";
+                updateAll();
+            } else {
+                updateAll();
+            }
+        });
+    }
+    
+    // 初始化UI + 额外处理IP示例重置 (可选加防抖)
+    window.addEventListener('DOMContentLoaded', () => {
+        bindMaskControls();
+        bindIpEdit();
+        // 初始化一次显示
+        updateAll();
+        // 额外同步默认IP二进制样式
+    });
+</script>
+</body>
+</html>
